@@ -30,7 +30,7 @@ class _LoginSignUpPageState extends State<LoginSignUpPage> {
     _isIos = Theme.of(context).platform == TargetPlatform.iOS;
     return new Scaffold(
         appBar: new AppBar(
-          title: new Text('Censing '),
+          title: new Text('Sense Control App '),
         ),
         body: Stack(
           children: <Widget>[

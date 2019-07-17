@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_login_demo/pages/collected_data_page.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_login_demo/pages/findNearDevices.dart';
+import 'package:flutter_login_demo/pages/filterDevices.dart';
 import 'package:flutter_login_demo/pages/authentication.dart';
+import 'package:flutter_login_demo/pages/configureNearDevice.dart';
+
 import 'package:flutter/foundation.dart';
 import 'dart:async';
-import 'dart:convert' show Encoding, json;
-import 'package:http/http.dart' as http;
+import 'package:location/location.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
   HomePage({
@@ -25,15 +30,68 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   String globalstate;
+  String id;
+  //var location = new Location();
+
+  var selectedUbication, selectedBrand;
+
+  int _selectedPage = 0;
+  var _pageOptions = [];
+
+  String distanceToLookAround;
 
   @override
-  void initState() {
+  initState() {
     super.initState();
+    repeatLookForNearDevices();
+    //getDistanceToLookAround();
+
+    final String id = widget.userId;
+    final String dist = "hola";
+    _pageOptions = [
+      FilterDevices(
+        userId: id,
+      ),
+      FindNearDevices(
+        userId: id,
+        distanceToLookAround: distanceToLookAround ,
+      )
+    ];
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  lookForNearDevices() async {
+    try {
+      var location = new Location();
+      LocationData userLocation;
+      userLocation = await location.getLocation();
+      var latitude = userLocation.latitude;
+      var longitude = userLocation.longitude;
+      DateTime now = DateTime.now();
+
+      FirebaseDatabase database = new FirebaseDatabase();
+      DatabaseReference _userRef =
+          database.reference().child('devicetriangulation');
+
+      _userRef.push().set({
+        'iduser': widget.userId,
+        'latitude': latitude,
+        'longitude': longitude,
+        //'timestamp': DateTime.now();,
+      });
+    } catch (e) {
+      e.toString();
+    }
+  }
+
+  repeatLookForNearDevices() {
+    const oneMin = const Duration(minutes: 1);
+    new Timer.periodic(oneMin, (Timer t) => lookForNearDevices());
+    print("Repitiendo");
   }
 
   _signOut() async {
@@ -45,114 +103,70 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  
-
-    Future<bool> _sendAction(String state) async {
-      final postUrl = 'https://fcm.googleapis.com/fcm/send';
-      final data = {
-        "notification": {"body": "The state has been changed", "title": "Sense App'"},
-        "data": {"status": "$state"},
-        "to": "/topics/"+widget.userId,
-      };
-
-      final headers = {
-        'content-type': 'application/json',
-        'Authorization': 'key=AAAAi7XpfEw:APA91bGVV_FDHpziuwOzCxy229-NdJD2mPSxTIOatXdDbrQFoux6BuhWR6088sJ23zy__71ij4oHP5TC3W-hVtTM9pMTplB5li5YwGsjHjOm3NTpcw9ZxCOuFSGMpXE0A9CxM7PmCxPB'
-      };
-
-      final response = await http.post(postUrl,
-          body: json.encode(data),
-          encoding: Encoding.getByName('utf-8'),
-          headers: headers);
-
-      if (response.statusCode == 200) {
-        print(response.toString());
-        return true;
-      } else {
-         print(response.toString());
-        return false;
-      }
-    }
-  
-
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
-      backgroundColor: Colors.white,
-      appBar: new AppBar(
-        title: new Text('Censing'),
-        elevation: defaultTargetPlatform == TargetPlatform.android ? 5.0 : 00,
-      ),
-      drawer: new Drawer(
-        child: new ListView(
-          children: <Widget>[
-            new UserAccountsDrawerHeader(
-              currentAccountPicture: new CircleAvatar(
-                backgroundColor: Colors.blueGrey,
-                child: new Text("P"),
+        backgroundColor: Colors.white,
+        appBar: new AppBar(
+          title: new Text('Sense Control App'),
+          elevation: defaultTargetPlatform == TargetPlatform.android ? 5.0 : 00,
+        ),
+        drawer: new Drawer(
+          child: new ListView(
+            children: <Widget>[
+              new UserAccountsDrawerHeader(
+                currentAccountPicture: new CircleAvatar(
+                  backgroundColor: Colors.blueGrey,
+                  child: new Text("Picture"),
+                ),
+                accountName: new Text("Misael"),
+                accountEmail: new Text("misaelastorgac@gmail.com"),
               ),
-              accountName: new Text("Prueba"),
-              accountEmail: new Text("Prueba@gmail.com"),
+              new Divider(),
+              new ListTile(
+                trailing: new Icon(Icons.settings),
+                title: new Text("Control of Devices"),
+                onTap: () => Navigator.of(context).pop(),
+              ),
+              new ListTile(
+                  trailing: new Icon(Icons.network_wifi),
+                  title: new Text("Configure Find Near Devices Mode "),
+                  onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => ConfigureNearDevice()))
+                          .then((string) {
+                        distanceToLookAround = string;
+                        print(distanceToLookAround);
+                      })),
+              new Divider(),
+              new ListTile(
+                trailing: new Icon(Icons.exit_to_app),
+                title: new Text("Logout"),
+                onTap: () => _signOut(),
+              ),
+            ],
+          ),
+        ),
+        body: _pageOptions[_selectedPage],
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.search),
+              title: Text('Filters'),
             ),
-            new Divider(),
-            new ListTile(
-              trailing: new Icon(Icons.settings),
-              title: new Text("Functions"),
-              onTap: () => Navigator.of(context).pop(),
-            ),
-            new ListTile(
-                trailing: new Icon(Icons.timeline),
-                title: new Text("Data Collected"),
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CollectedData("Censing"),
-                    ))),
-            new Divider(),
-            new ListTile(
-              trailing: new Icon(Icons.exit_to_app),
-              title: new Text("Logout"),
-              onTap: () => _signOut(),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.signal_wifi_4_bar),
+              title: Text('Find Near Devices'),
             ),
           ],
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: <Widget>[
-            FlatButton(
-              onPressed: () => _sendAction("Start")
-                  // setState(() => state = "Start");
-                  ,
-              color: Colors.white,
-              padding: EdgeInsets.all(10.0),
-              child: Column(
-                // Replace with a Row for horizontal icon + text
-                children: <Widget>[Icon(Icons.play_arrow), Text("Play")],
-              ),
-            ),
-            FlatButton(
-              onPressed: () => _sendAction("Pause"),
-              color: Colors.white,
-              padding: EdgeInsets.all(10.0),
-              child: Column(
-                // Replace with a Row for horizontal icon + text
-                children: <Widget>[Icon(Icons.pause), Text("Pause ")],
-              ),
-            ),
-            FlatButton(
-              onPressed: () => _sendAction("Stop"),
-              color: Colors.white,
-              padding: EdgeInsets.all(10.0),
-              child: Column(
-                // Replace with a Row for horizontal icon + text
-                children: <Widget>[Icon(Icons.stop), Text("Stop")],
-              ),
-            )
-          ],
-        ),
-      ),
-    );
+          currentIndex: _selectedPage,
+          selectedItemColor: Colors.lightBlue[900],
+          onTap: (int index) {
+            setState(() {
+              _selectedPage = index;
+            });
+          },
+        ));
   }
 }
